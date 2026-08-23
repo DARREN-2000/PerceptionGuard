@@ -1,0 +1,29 @@
+# GPU / edge-inference extras.
+#
+# NONE of these were installable in the development environment (no GPU, no
+# network), so no FP16/INT8/TensorRT number is quoted anywhere in this repo.
+# This file exists so the deployment path in docs/DEPLOYMENT.md is executable
+# on a real GPU machine, not so the README looks longer.
+#
+#   pip install -r requirements.txt -r requirements-gpu.txt
+
+-r requirements.txt
+
+# Detector backend (src/perceptionguard/inference/torch_detector.py).
+# Install the CUDA build matching your driver, e.g.:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+torch>=2.1
+torchvision>=0.16
+
+# PyTorch -> ONNX export (src/perceptionguard/inference/onnx_export.py)
+onnx>=1.15
+onnxruntime-gpu>=1.17
+
+# TensorRT is intentionally NOT pinned here. Install the build matching your
+# CUDA/cuDNN and platform (JetPack on Jetson, the NVIDIA index on desktop):
+#   pip install tensorrt --extra-index-url https://pypi.nvidia.com
+# Engine building uses `trtexec`, which ships with the TensorRT install.
+
+# Optional: point-cloud inspection of the 3D estimates. Not required by the
+# pipeline -- the geometry core is plain NumPy.
+open3d>=0.18

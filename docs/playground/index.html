@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playground &middot; PerceptionGuard</title>
+<meta name="description" content="Interactive viewer over 1,776 precomputed frames of the PerceptionGuard perception + reliability pipeline. Inject degradations and watch the reliability monitor react.">
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="../">Perception<span>Guard</span></a>
+    <div class="links">
+      <a href="../#results">Results</a>
+      <a href="../#honesty">Honest findings</a>
+      <a href="../#architecture">Architecture</a>
+      <a href="./">Playground</a>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="pg-head">
+    <h1>Perception reliability playground</h1>
+    <p>
+      Inject a controlled degradation and watch the monitor react frame by frame. Every
+      number, box and pixel below was produced by the real Python pipeline and verified
+      frame-by-frame against <code>outputs/experiments.csv</code> &mdash; <b>0 mismatches
+      across all 1,776 frames</b>. Nothing here is simulated in JavaScript.
+      Use <b>&larr; &rarr;</b> to step frames, <b>space</b> to play.
+    </p>
+  </div>
+
+  <div id="boot" class="loading">Loading measured results&hellip;</div>
+
+  <div id="app" class="pg-layout" hidden>
+    <aside class="controls">
+      <h3>Conditions</h3>
+      <div class="ctl">
+        <label for="scene">Scene</label>
+        <select id="scene"></select>
+      </div>
+      <div class="ctl">
+        <label for="deg">Degradation &middot; channel</label>
+        <select id="deg"></select>
+      </div>
+      <div class="ctl">
+        <label for="sev">Severity</label>
+        <select id="sev"></select>
+      </div>
+      <div class="ctl">
+        <label for="frame">Frame <span id="frameLabel"></span></label>
+        <div class="row">
+          <input type="range" id="frame" min="0" value="0">
+          <button class="mini" id="play">Play</button>
+        </div>
+      </div>
+      <h3 style="margin-top:24px">Try these</h3>
+      <div class="presets" id="presets"></div>
+    </aside>
+
+    <main>
+      <div id="statusbar" class="statusbar"></div>
+
+      <div class="viewer">
+        <figure>
+          <div class="panel" id="panelRgb"></div>
+          <figcaption>RGB with ground truth and predictions</figcaption>
+          <div class="legend">
+            <span><i style="background:#5aff96"></i>detected</span>
+            <span><i style="background:#ff3c3c"></i>missed (FN)</span>
+            <span><i style="background:#ffaa28"></i>false positive</span>
+            <span><i style="background:#aaa"></i>ground truth</span>
+          </div>
+        </figure>
+        <figure>
+          <div class="panel" id="panelDepth"></div>
+          <figcaption>Depth &mdash; near is red, black is no return</figcaption>
+        </figure>
+      </div>
+
+      <div id="verdict" class="verdict"></div>
+
+      <div class="grid2">
+        <section class="card">
+          <h3>Reliability across the sequence</h3>
+          <p class="hint">Bands are the calibrated buckets. Red ticks along the bottom mark frames where
+          ground truth says perception actually failed. Click to jump.</p>
+          <div id="timeline"></div>
+        </section>
+
+        <section class="card">
+          <h3>Why &mdash; signal contributions</h3>
+          <p class="hint">Bar length is signal health (1.0 = healthy). The number after the value is that
+          signal's contribution to the deficit, <code>w &times; -ln(s)</code>. Fusion is a weighted
+          geometric mean, so these contributions add up to exactly the score shown above.</p>
+          <div id="signals"></div>
+          <h3 style="margin-top:18px">Diagnosis</h3>
+          <div class="chips" id="diagnosis"></div>
+        </section>
+      </div>
+
+      <div class="kv" id="stats"></div>
+
+      <div class="note" style="margin-top:22px">
+        <h4>What you are looking at</h4>
+        <p>Signals with weight 0.000 were <b>clamped</b> during calibration because their
+        unconstrained fitted weight was negative &mdash; they are anti-correlated with failure for this
+        detector. They are still displayed rather than hidden, because a monitor that quietly drops
+        its own broken inputs is not trustworthy. See the honest-findings section on the home page.</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<footer class="wrap">
+  PerceptionGuard &middot; precomputed from the real pipeline, verified against the measured CSV.
+</footer>
+
+<script src="../assets/js/playground.js"></script>
+</body>
+</html>

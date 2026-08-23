@@ -1,0 +1,23 @@
+{
+  "weights": {
+    "chroma": 0.0,
+    "clipping": 0.47785950805992083,
+    "confidence": 0.0893970654057923,
+    "depth_consistency": 0.0,
+    "depth_valid": 0.006977016430119741,
+    "exposure": 0.0,
+    "geometry": 0.134475521591685,
+    "motion": 0.05904647743084045,
+    "noise": 0.0,
+    "ood": 0.0,
+    "sharpness": 0.0,
+    "temporal": 0.0,
+    "timing": 0.23224441108164165
+  },
+  "threshold_trusted": 0.964,
+  "threshold_caution": 0.94,
+  "train_scene": "multi",
+  "test_scene": "approach",
+  "test_auroc_fitted": 0.9835795011314478,
+  "test_auroc_confidence_baseline": 0.8041499313394924
+}

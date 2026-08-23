@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PerceptionGuard &middot; Runtime reliability monitoring for 3D perception</title>
+<meta name="description" content="Can an autonomous system know when its own perception cannot be trusted? A full RGB-D perception pipeline with a 13-signal reliability monitor, validated on 1,776 measured frames.">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="./">Perception<span>Guard</span></a>
+    <div class="links">
+      <a href="#results">Results</a>
+      <a href="#honesty">Honest findings</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#reproduce">Reproduce</a>
+      <a href="playground/">Playground</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Computer vision &middot; 3D perception &middot; robotics reliability</div>
+    <h1>Perception that knows<br>when to distrust itself.</h1>
+    <p class="lede">
+      A detector that is wrong is survivable. A detector that is wrong <em>and confident</em> is not.
+      PerceptionGuard runs a full RGB-D perception pipeline &mdash; detection, tracking, depth, 3D
+      geometry &mdash; and in parallel scores its own trustworthiness from 13 independent signals,
+      then says <em>why</em>.
+    </p>
+
+    <p class="question">Can an autonomous system determine, at runtime, whether its perception can currently be trusted?</p>
+
+    <div class="term">
+<span class="cmt"># calibration drift, severity 1.0 - the image looks perfect</span>
+PERCEPTION STATUS: <span class="bad">DEGRADED</span>
+  reliability      <span class="bad">0.31</span>   <span class="k">TRUSTED &ge; 0.964 | CAUTION &ge; 0.940</span>
+  detector conf    <span class="good">0.94</span>   <span class="k">&lt;- high. the detector is confident and wrong</span>
+  geometry         <span class="bad">0.22</span>   <span class="k">&lt;- reprojection disagrees with the class-height prior</span>
+  motion           <span class="warn">0.34</span>   <span class="k">&lt;- 3D positions jumping between frames</span>
+  likely cause     Geometric inconsistency (calibration or depth scale error)
+    </div>
+
+    <p class="lede">
+      That is the whole point: <b>detector confidence was 0.94 while perception was broken.</b>
+      Confidence cannot see calibration drift, because the detector never looks at the calibration.
+    </p>
+
+    <div class="cta">
+      <a class="btn primary" href="playground/">Open the playground &rarr;</a>
+      <a class="btn" href="#results">See the measured results</a>
+      <a class="btn" href="#honesty">Read what does not work</a>
+    </div>
+  </div>
+</header>
+
+<section class="block" id="results">
+  <div class="wrap">
+    <h2>Measured results</h2>
+    <p class="sub">
+      1,776 frames = 2 scenes &times; 24 frames &times; (9 degradations &times; 4 severities + clean).
+      Measured perception failure rate 0.350. Every number on this page comes from
+      <code>outputs/experiments.csv</code>; nothing is estimated or rounded up.
+    </p>
+
+    <div class="stats">
+      <div class="stat good"><div class="v">0.984</div><div class="l">Held-out AUROC for predicting perception failure</div></div>
+      <div class="stat"><div class="v">0.804</div><div class="l">Raw detector confidence, the baseline to beat</div></div>
+      <div class="stat accent"><div class="v">+0.179</div><div class="l">Improvement from fusing signals</div></div>
+      <div class="stat"><div class="v">6.65 ms</div><div class="l">Monitor cost, 14.9% of the frame budget</div></div>
+    </div>
+
+    <h3>Does fusing signals beat raw detector confidence?</h3>
+    <p class="sub">Trained on the <code>multi</code> scene, evaluated on the held-out <code>approach</code> scene.
+    Splitting by scene rather than by frame matters: consecutive frames are near-duplicates and a random
+    split would leak.</p>
+    <table>
+      <thead><tr><th>Failure predictor</th><th class="num">AUROC (held out)</th></tr></thead>
+      <tbody>
+        <tr><td>Raw detector confidence</td><td class="num">0.804</td></tr>
+        <tr><td>Hand-set a-priori weights</td><td class="num">0.851</td></tr>
+        <tr><td><b>Fitted non-negative weights (deployed)</b></td><td class="num"><strong class="hl">0.984</strong></td></tr>
+        <tr><td>Unconstrained fit &mdash; <em>rejected, see below</em></td><td class="num">0.971</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Do the reliability buckets mean anything?</h3>
+    <table>
+      <thead><tr><th>Bucket</th><th class="num">Frames</th><th class="num">Share</th><th class="num">Measured failure rate</th></tr></thead>
+      <tbody>
+        <tr><td class="s-TRUSTED">TRUSTED &ge; 0.964</td><td class="num">103</td><td class="num">11.6%</td><td class="num"><strong class="hl">0.000</strong></td></tr>
+        <tr><td class="s-CAUTION">CAUTION 0.940&ndash;0.964</td><td class="num">171</td><td class="num">19.3%</td><td class="num"><strong class="hl">0.000</strong></td></tr>
+        <tr><td class="s-DEGRADED">DEGRADED &lt; 0.940</td><td class="num">614</td><td class="num">69.1%</td><td class="num">0.389</td></tr>
+      </tbody>
+    </table>
+    <p class="sub">Monotonic, and nothing inside TRUSTED actually failed on the held-out scene.</p>
+
+    <h3>Can it warn early?</h3>
+    <p class="sub">Reliability at the <em>lowest</em> severity of each degradation, against a clean baseline of 0.951.
+    All nine degradations score below the TRUSTED cut at their mildest setting.</p>
+    <table>
+      <thead><tr><th>Degradation</th><th class="num">Score at severity 0.25</th><th class="num">vs clean</th><th class="num">Actual failure rate</th></tr></thead>
+      <tbody>
+        <tr><td>frame_delay</td><td class="num">0.802</td><td class="num">&minus;0.149</td><td class="num">0.54</td></tr>
+        <tr><td>patch_occlusion</td><td class="num">0.873</td><td class="num">&minus;0.077</td><td class="num">0.27</td></tr>
+        <tr><td>distribution_shift</td><td class="num">0.934</td><td class="num">&minus;0.017</td><td class="num">0.10</td></tr>
+        <tr><td>calibration_error</td><td class="num">0.940</td><td class="num">&minus;0.011</td><td class="num">0.10</td></tr>
+        <tr><td>noise</td><td class="num">0.941</td><td class="num">&minus;0.010</td><td class="num">0.10</td></tr>
+        <tr><td>motion_blur</td><td class="num">0.946</td><td class="num">&minus;0.005</td><td class="num">0.12</td></tr>
+        <tr><td>glare</td><td class="num">0.947</td><td class="num">&minus;0.003</td><td class="num">0.10</td></tr>
+        <tr><td>low_light</td><td class="num">0.948</td><td class="num">&minus;0.003</td><td class="num">0.10</td></tr>
+        <tr><td>depth_degradation</td><td class="num">0.950</td><td class="num">&minus;0.001</td><td class="num">0.10</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Does it identify the right cause?</h3>
+    <p class="sub">Fraction of frames (severity &ge; 0.5) where the true cause appears in the top-3 diagnosis.</p>
+    <table>
+      <thead><tr><th>Degradation</th><th class="num">Top-3 hit rate</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td>distribution_shift</td><td class="num">1.00</td><td>reliable</td></tr>
+        <tr><td>frame_delay</td><td class="num">1.00</td><td>reliable</td></tr>
+        <tr><td>patch_occlusion</td><td class="num">0.99</td><td>reliable</td></tr>
+        <tr><td>calibration_error</td><td class="num">0.98</td><td>reliable</td></tr>
+        <tr><td>motion_blur</td><td class="num">0.98</td><td>reliable</td></tr>
+        <tr><td>depth_degradation</td><td class="num">0.85</td><td>usable</td></tr>
+        <tr><td>noise</td><td class="num">0.55</td><td>weak</td></tr>
+        <tr><td>low_light</td><td class="num">0.53</td><td>weak</td></tr>
+        <tr><td>glare</td><td class="num">0.49</td><td><b>coin flip &mdash; open issue</b></td></tr>
+      </tbody>
+    </table>
+    <p class="sub">Glare and low light are entangled: both move exposure and clipping in overlapping
+    ways, so the monitor detects <em>that</em> something is wrong far more reliably than <em>which</em>
+    of the two it is.</p>
+
+    <h3>Figures</h3>
+    <div class="figs">
+      <figure><img src="assets/figures/reliability_vs_severity.png" alt="Reliability against degradation severity"><figcaption>Reliability falls as severity rises, per degradation.</figcaption></figure>
+      <figure><img src="assets/figures/roc_fused_vs_confidence.png" alt="ROC of fused reliability against raw confidence"><figcaption>Fused reliability vs raw detector confidence, held-out scene.</figcaption></figure>
+      <figure><img src="assets/figures/signal_auroc.png" alt="Per-signal AUROC"><figcaption>Per-signal AUROC. Two signals land below 0.5.</figcaption></figure>
+      <figure><img src="assets/figures/latency.png" alt="Latency breakdown"><figcaption>Per-stage latency on 2 vCPU with no GPU.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="honesty">
+  <div class="wrap">
+    <h2>Honest findings, including the ones that look bad</h2>
+    <p class="sub">This section exists because a portfolio project that reports only its wins is not
+    engineering, it is marketing. Each of these was measured, and each survived into the final repo
+    rather than being tuned away.</p>
+
+    <div class="note bad">
+      <h4>1. The false-alarm rate on clean frames is 0.646</h4>
+      <p>Almost two thirds of clean frames score below TRUSTED. The monitor errs toward distrust,
+      which is the correct direction for an emergency-braking consumer, but it is high. This is an
+      open issue, not a solved problem.</p>
+    </div>
+
+    <div class="note bad">
+      <h4>2. Two signals are anti-correlated with failure</h4>
+      <p><code>sharpness</code> scores AUROC 0.452 and <code>noise</code> 0.472 &mdash; both worse than a
+      coin flip. Cause: the reference detector matches <em>hue</em>, and hue survives blur, so blur lowers
+      the sharpness signal without actually breaking perception. Both are clamped to zero weight and
+      reported rather than quietly deleted. This is specific to the colour-model backend.</p>
+    </div>
+
+    <div class="note">
+      <h4>3. Pooling the scenes reverses the conclusion (Simpson's paradox)</h4>
+      <p>Pooled across both scenes, fused reliability (0.706) looks <em>worse</em> than raw confidence
+      (0.739). Per-scene and held out, it is 0.984 vs 0.804. The two scenes have different base failure
+      rates (0.431 vs 0.269), so the pooled comparison is simply the wrong one. This was nearly written
+      up as a negative result.</p>
+    </div>
+
+    <div class="note">
+      <h4>4. The unconstrained fit scored well and was rejected anyway</h4>
+      <p>It reached 0.971 by assigning <em>negative</em> weights to chroma, depth consistency, exposure,
+      noise, sharpness and temporal &mdash; learning &ldquo;which scene am I in&rdquo; from differing base
+      rates rather than &ldquo;is perception failing&rdquo;. Non-negativity makes every weight mean
+      <em>more of this signal &rArr; less trust</em>, which is the only form safe to deploy.</p>
+    </div>
+
+    <div class="note">
+      <h4>5. The best standalone signal has a deployed weight of zero</h4>
+      <p><code>temporal</code> has the highest individual AUROC (0.822) but is collinear with
+      <code>motion</code> (0.799), which the fit preferred. High individual informativeness does not imply
+      marginal contribution.</p>
+    </div>
+
+    <div class="note good">
+      <h4>6. A reproducibility bug found by cross-checking the site against the CSV</h4>
+      <p>Building this page revealed that degradation seeding used Python's builtin <code>hash()</code> on a
+      string, which is randomized per process. <code>noise</code>, <code>glare</code> and
+      <code>patch_occlusion</code> therefore produced <em>different</em> corruption on every run &mdash; 187
+      frames disagreed. Fixed with a stable BLAKE2b seed, verified identical across processes, and the whole
+      evaluation chain was re-run. The playground now matches the CSV on <b>all 1,776 frames</b>.</p>
+    </div>
+
+    <h3>What this system cannot detect</h3>
+    <ul>
+      <li><b>Consistent-but-wrong perception.</b> If the detector confidently mislabels a static object every
+      frame, temporal consistency, depth and geometry all agree. Nothing fires.</li>
+      <li><b>Correlated feature drift.</b> The OOD reference uses a diagonal covariance; with tens of clean
+      frames a full covariance is rank-deficient. Drift along a correlated direction is invisible.</li>
+      <li><b>Sim-to-real distribution shift.</b> A hue rotation is not a new city, new weather or a new sensor.</li>
+      <li><b>Its own calibration going stale.</b> Baselines are fitted once on clean frames; on a real robot
+      they must be re-fitted per deployment.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="block" id="architecture">
+  <div class="wrap">
+    <h2>Architecture</h2>
+    <pre class="code"><code>RGB + depth ──▶ detect ──▶ track ──▶ lift to 3D ──▶ geometric check
+                  │          │            │               │
+                  └──────────┴────────────┴───────────────┴──▶ reliability monitor
+                                                                        │
+                                            13 signals ──▶ 4 channels ──▶ score + diagnosis</code></pre>
+
+    <p class="sub">The monitor consumes four <em>independent</em> channels, so no single failure can
+    silently take out every signal at once.</p>
+    <table>
+      <thead><tr><th>Channel</th><th>Signals</th><th>What it can see</th></tr></thead>
+      <tbody>
+        <tr><td>Appearance</td><td>sharpness, exposure, clipping, noise, chroma, ood</td><td>Image quality, distribution shift</td></tr>
+        <tr><td>Detection</td><td>confidence</td><td>Model self-report</td></tr>
+        <tr><td>Temporal</td><td>temporal, motion, timing</td><td>Frame-to-frame agreement, dropped frames</td></tr>
+        <tr><td>Geometric</td><td>geometry, depth_valid, depth_consistency</td><td>Physical consistency, <b>calibration</b></td></tr>
+      </tbody>
+    </table>
+
+    <div class="note good">
+      <h4>Fusion is a weighted geometric mean, not a sum</h4>
+      <p>A geometric mean lets any single signal veto the frame. With a sum, twelve healthy signals can
+      outvote one that has collapsed to zero &mdash; exactly the failure mode a safety monitor must not have.
+      Because <code>weighted geometric mean = exp(&minus;&Sigma; w&middot;deficit)</code>, fitting a linear
+      model on log-signals yields the geometric-mean weights directly: calibration changes the weights
+      without changing the fusion form.</p>
+    </div>
+
+    <h3>Two different weight tables, and why they disagree</h3>
+    <p class="sub">These are easy to confuse, so both are published. The standardized coefficients say which
+    signal carries the most information <em>per standard deviation</em>; the deployed weights are those
+    divided by each signal's spread and normalized, which is what actually ships.</p>
+    <table>
+      <thead><tr><th>Signal</th><th class="num">Standardized coefficient</th><th class="num">Deployed weight</th></tr></thead>
+      <tbody>
+        <tr><td>geometry</td><td class="num">1.855</td><td class="num">0.135</td></tr>
+        <tr><td>clipping</td><td class="num">1.304</td><td class="num"><b>0.478</b></td></tr>
+        <tr><td>confidence</td><td class="num">1.154</td><td class="num">0.089</td></tr>
+        <tr><td>motion</td><td class="num">0.800</td><td class="num">0.059</td></tr>
+        <tr><td>timing</td><td class="num">0.316</td><td class="num">0.232</td></tr>
+        <tr><td>depth_valid</td><td class="num">0.097</td><td class="num">0.007</td></tr>
+        <tr><td>chroma, depth_consistency, exposure, noise, ood, sharpness, temporal</td><td class="num">0.000</td><td class="num">0.000</td></tr>
+      </tbody>
+    </table>
+    <p class="sub">The ordering flips because <code>clipping</code> sits at 1.000 in almost every condition:
+    a small spread means a large per-unit weight, so when it finally moves, it moves the score hard. Reporting
+    only one of these tables would misrepresent the system.</p>
+
+    <h3>Engineering decisions worth defending</h3>
+    <ul>
+      <li><b>Association is three-pass</b>: IoU, then centre-distance recovery, then
+      <em>union-of-fragments</em>. When an occluder splits one object into two blobs, a single frame genuinely
+      cannot distinguish that from two adjacent objects &mdash; only the track prior can. So the fix lives in the
+      tracker, not in a detector heuristic. An earlier detector-side merge was implemented, proven unable to
+      work, and fully reverted.</li>
+      <li><b>The depth gate is measured in pixel-footprint units</b>, not metres. At 30 m, 1 px is 60 mm;
+      metres is the wrong unit for a projective sensor.</li>
+      <li><b>AUROC returns NaN, not 0.5, when a class is absent.</b> A fake 0.5 silently pollutes averages.</li>
+      <li><b>Metrics are hand-implemented</b> and unit-tested against hand-computed values, because scipy and
+      scikit-learn were unavailable.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="block" id="reproduce">
+  <div class="wrap">
+    <h2>Reproduce it</h2>
+    <p class="sub">No dataset download. Scenes are rendered analytically, which gives exact ground truth for
+    the geometry, ground truth for the <em>degradation itself</em>, and reproducible failure injection.</p>
+<pre class="code"><code>pip install -r requirements.txt
+export PYTHONPATH=src
+
+python scripts/smoke_m1.py           <span class="cmt"># geometry + detection + tracking gates</span>
+python -m unittest discover -s tests <span class="cmt"># 53 tests</span>
+python scripts/run_experiments.py    <span class="cmt"># 1,776-frame sweep</span>
+python scripts/calibrate_monitor.py  <span class="cmt"># fit weights + thresholds</span>
+python scripts/build_site_data.py    <span class="cmt"># regenerate this playground</span></code></pre>
+
+    <table>
+      <thead><tr><th>Verification gate</th><th class="num">Result</th></tr></thead>
+      <tbody>
+        <tr><td>PnP rotation / translation / reprojection</td><td class="num">0.0000&deg; / 0.0000 m / 0.0000 px</td></tr>
+        <tr><td>Depth lies on object surfaces (interior)</td><td class="num">0.370 px-equivalent</td></tr>
+        <tr><td>Clean detection precision / recall / F1</td><td class="num">0.961 / 0.961 / 0.961</td></tr>
+        <tr><td>Track identity stability</td><td class="num">1 ID per object (3/3)</td></tr>
+        <tr><td>Test suite</td><td class="num">53 passed</td></tr>
+        <tr><td>Playground vs measured CSV</td><td class="num">0 mismatches / 1,776</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <h4>Scope, stated plainly</h4>
+      <p>The development environment had no GPU, no network, 2 vCPU and 4 GB RAM, so the reference detector is
+      a deterministic colour model rather than a CNN, and <b>no FP16/INT8/TensorRT speedup is quoted anywhere</b>
+      &mdash; none was measured. <code>TorchDetector</code> implements the identical <code>Detector</code>
+      protocol as the swap seam, so &ldquo;fusion beats confidence&rdquo; must be re-measured with a real network
+      before it is generalized.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap">
+  <p>PerceptionGuard &mdash; reliable 3D perception and runtime reliability monitoring for autonomous systems.
+  All figures generated from <code>outputs/experiments.csv</code>. MIT licensed.</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Outputs are reproducible -- regenerate with scripts/run_experiments.py
+outputs/figures/
+outputs/*.png
+outputs/*.log
+
+# Keep the measured sweep and the fitted weights: they back the README's numbers
+!outputs/experiments.csv
+!configs/monitor_weights.json
+
+# Model artifacts
+*.onnx
+*.plan
+*.engine
+*.pt
+*.pth
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

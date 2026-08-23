@@ -1,0 +1,26 @@
+# Code Owners
+
+# These owners will be the default reviewers for pull requests in these directories.
+
+# Global owners
+* @DARREN-2000
+
+# Backend API
+/src/ @DARREN-2000
+/tests/ @DARREN-2000
+/alembic/ @DARREN-2000
+
+# Frontend Dashboard
+/frontend/ @DARREN-2000
+
+# Product Website
+/website/ @DARREN-2000
+
+# Infrastructure and Deployment
+/deploy/ @DARREN-2000
+Dockerfile @DARREN-2000
+docker-compose.yml @DARREN-2000
+
+# Documentation
+/docs/ @DARREN-2000
+README.md @DARREN-2000

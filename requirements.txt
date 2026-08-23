@@ -1,0 +1,21 @@
+# Core runtime. These are the only packages the library itself imports.
+# Verified working on Python 3.13 (development sandbox) and pinned as lower
+# bounds rather than exact versions so the package stays installable on the
+# older Python found on most robot targets (>=3.10).
+numpy>=1.24
+opencv-python-headless>=4.8
+
+# Experiment runner + calibration (scripts/run_experiments.py, calibrate_monitor.py)
+pandas>=2.0
+
+# Figures (scripts/make_plots.py)
+matplotlib>=3.7
+
+# Optional: visualization app (apps/streamlit_app.py).
+# Not installed in the development sandbox -- the app is written against the
+# documented Streamlit API but has never been executed. See README.
+# streamlit>=1.30
+
+# The GPU / export path lives in requirements-gpu.txt and is deliberately
+# separate: none of it is importable in the development sandbox, and the
+# perception core must stay installable without it.

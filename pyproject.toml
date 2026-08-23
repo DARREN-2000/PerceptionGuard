@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "perceptionguard"
+version = "0.1.0"
+description = "Reliable 3D perception with runtime reliability monitoring for autonomous systems"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Darren Babu" }]
+keywords = ["computer-vision", "perception", "robotics", "3d", "reliability", "uncertainty"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Image Recognition",
+]
+
+# Core runtime only. Everything the library itself imports is listed here;
+# anything heavier (torch, streamlit, matplotlib) is an explicit extra so the
+# perception + reliability core stays installable on a small edge target.
+dependencies = [
+  "numpy>=1.24",
+  "opencv-python-headless>=4.8",
+]
+
+[project.optional-dependencies]
+# Experiment runner and calibration scripts.
+experiments = ["pandas>=2.0", "matplotlib>=3.7"]
+# Visualization app.
+viz = ["streamlit>=1.30", "matplotlib>=3.7"]
+# GPU / deployment path. NOT exercised in the development environment --
+# see docs/DEPLOYMENT.md for what is measured and what is not.
+gpu = ["torch>=2.1", "torchvision>=0.16", "onnx>=1.15", "onnxruntime-gpu>=1.17"]
+dev = ["ruff>=0.4", "mypy>=1.8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+src = ["src", "scripts", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "NPY"]
+ignore = [
+  "E501",  # long lines are usually explanatory comments, which we want
+  "B905",  # zip(strict=) not available on the minimum supported version
+]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+# Deliberately not --strict: the numeric code passes ndarray around and
+# over-annotating it would add noise without catching real defects.
+disallow_untyped_defs = false
